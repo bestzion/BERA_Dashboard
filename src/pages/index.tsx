@@ -15,7 +15,6 @@ export default function HomePage() {
   return (
     <DashboardConnected
       account={account}
-      ethBalance={ethBalance}
       onDisconnect={disconnect}
     />
   );

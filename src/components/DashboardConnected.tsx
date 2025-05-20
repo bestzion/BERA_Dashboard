@@ -1,116 +1,155 @@
 // src/components/DashboardConnected.tsx
 import React, { useEffect, useState } from "react";
+import {
+  fetchZapperPortfolio,
+  fetchTokenPrice,
+  ZapperTokenNode,
+} from "../lib/zapper";
 
 interface TokenInfo {
-  symbol: string;       // ex. "ETH"
-  name: string;         // ex. "Ethereum"
-  price: number;        // ex. 1875.23
-  change24h: number;    // ex. +1.23  (%)
-  balance: number;      // ex. 0.5
+  symbol: string;
+  name: string;
+  logoUrl: string;
+  balance: number;
+  price: number;
+  value: number;
+  chain: string;
+  priceChange24h: number;
 }
 
 interface Props {
   account: string;
-  ethBalance: string;
   onDisconnect: () => void;
 }
 
-const DashboardConnected: React.FC<Props> = ({
-  account,
-  ethBalance,
-  onDisconnect,
-}) => {
+const DashboardConnected: React.FC<Props> = ({ account, onDisconnect }) => {
   const short = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-3)}`;
-
-  // 더미 토큰 데이터 (나중에 API 호출로 교체)
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const getChainId = (networkName: string): number => {
+    const key = networkName.toLowerCase();
+    if (key.includes("ethereum")) return 1;
+    if (key.includes("berachain")) return 80094;
+    return 0;
+  };
 
   useEffect(() => {
-    // TODO: 실제론 Coingecko / On-Chain API로 불러오기
-    setTokens([
-      {
-        symbol: "ETH",
-        name: "Ethereum",
-        price: 1875.23,
-        change24h: +1.23,
-        balance: 0.5,
-      },
-      {
-        symbol: "USDC",
-        name: "USD Coin",
-        price: 1.00,
-        change24h: -0.02,
-        balance: 123.45,
-      },
-      // … 다른 토큰 …
-    ]);
-  }, []);
+    if (!account) return;
+    (async () => {
+      setLoading(true);
+      try {
+        const nodes = await fetchZapperPortfolio(account, 50);
+        const infos = await Promise.all(
+          nodes.map(async (n) => {
+            const chainId = getChainId(n.network.name);
+            let change = 0;
+            try {
+              const pd = await fetchTokenPrice(n.tokenAddress, chainId);
+              change = pd.priceChange24h ?? 0;
+            } catch (e) {
+              console.warn(`fetchTokenPrice failed for ${n.symbol}`, e);
+            }
+            return {
+              symbol: n.symbol,
+              name: n.name,
+              logoUrl: n.imgUrlV2,
+              balance: n.balance,
+              price: n.price,
+              value: n.balanceUSD,
+              chain: n.network.name,
+              priceChange24h: change,
+            };
+          })
+        );
+        setTokens(infos);
+        setError(null);
+      } catch (e) {
+        console.error(e);
+        setError("잔고 조회 중 오류가 발생했습니다.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [account]);
 
   return (
     <main className="bg-white min-h-screen flex flex-col items-center">
-      <div className="w-full max-w-[1440px] h-screen relative px-[60px] pt-[50px]">
-        {/* 헤더 */}
+      <div className="w-full max-w-[1440px] px-[60px] pt-[50px]">
         <header className="flex justify-between items-center">
-          <h1 className="text-3xl font-hepta font-normal text-black">
-            Ignight Dashboard
-          </h1>
+          <h1 className="text-3xl font-serif text-black">Ignight Dashboard</h1>
           <button
             onClick={onDisconnect}
-            className="h-[40px] w-52 bg-[#b2d5ff] text-black hover:bg-[#a0c9f8]
-                       rounded-2xl flex items-center justify-center
-                       shadow-md transition"
-            style={{ paddingTop: 0, paddingBottom: 0 }}
+            className="h-[40px] w-52 bg-[#b2d5ff] hover:bg-[#a0c9f8] rounded-2xl
+                       flex items-center justify-center shadow-md transition"
           >
-            <span className="text-lg font-hepta font-normal">
+            <span className="text-lg font-serif text-black">
               {short(account)}
             </span>
           </button>
         </header>
 
-        {/* Assets */}
-        <h2 className="mt-8 text-xl font-hepta">Assets</h2>
+        <h2 className="mt-8 text-xl font-serif">Assets</h2>
         <div className="mt-4 border rounded-xl overflow-y-auto max-h-[60vh]">
-          <table className="w-full table-auto">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left">Ticker</th>
-                <th className="px-4 py-3 text-left">Name</th>
-                <th className="px-4 py-3 text-right">Price</th>
-                <th className="px-4 py-3 text-right">24h %</th>
-                <th className="px-4 py-3 text-right">Balance</th>
-                <th className="px-4 py-3 text-right">Value ($)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {tokens.map((t) => {
-                const value = (t.price * t.balance).toFixed(2);
-                const changeClass =
-                  t.change24h > 0 ? "text-green-600" : "text-red-600";
-                return (
-                  <tr key={t.symbol}>
-                    <td className="px-4 py-3 flex items-center">
-                      {/* 기호 아이콘 넣고 싶으면 여기에 <img> */}
-                      <span className="font-semibold">{t.symbol}</span>
-                    </td>
-                    <td className="px-4 py-3">{t.name}</td>
-                    <td className="px-4 py-3 text-right">
-                      ${t.price.toFixed(2)}
-                    </td>
-                    <td className={`px-4 py-3 text-right ${changeClass}`}>
-                      {t.change24h > 0 && "+"}
-                      {t.change24h.toFixed(2)}%
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {t.balance}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      ${value}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {loading && <p className="p-4">데이터 로딩 중...</p>}
+          {error && <p className="p-4 text-red-500">{error}</p>}
+
+          {!loading && !error && (
+            <table className="w-full table-auto">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left">Chain</th>
+                  <th className="px-6 py-3 text-left">Asset</th>
+                  <th className="px-6 py-3 text-left">Name</th>
+                  <th className="px-6 py-3 text-right">Price (USD)</th>
+                  <th className="px-6 py-3 text-right">24h Change</th>
+                  <th className="px-6 py-3 text-right">Balance</th>
+                  <th className="px-6 py-3 text-right">Value (USD)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {tokens.map((t) => {
+                  const balDisplay =
+                    t.balance < 0.01 ? "<0.01" : t.balance.toFixed(4);
+                  const valDisplay =
+                    t.value < 0.01
+                      ? "<$0.01"
+                      : `$${t.value.toFixed(2)}`;
+                  const priceDisplay = `$${t.price.toFixed(4)}`;
+                  const change = t.priceChange24h.toFixed(2) + "%";
+
+                  return (
+                    <tr key={t.symbol + t.chain}>
+                      <td className="px-6 py-3">{t.chain}</td>
+                      <td className="px-6 py-3 flex items-center">
+                        <img
+                          src={t.logoUrl}
+                          alt={t.symbol}
+                          className="w-6 h-6 rounded-full mr-2"
+                        />
+                        <span className="font-semibold">{t.symbol}</span>
+                      </td>
+                      <td className="px-6 py-3">{t.name}</td>
+                      <td className="px-6 py-3 text-right">{priceDisplay}</td>
+                      <td
+                        className={
+                          "px-6 py-3 text-right " +
+                          (t.priceChange24h >= 0
+                            ? "text-green-600"
+                            : "text-red-600")
+                        }
+                      >
+                        {change}
+                      </td>
+                      <td className="px-6 py-3 text-right">{balDisplay}</td>
+                      <td className="px-6 py-3 text-right">{valDisplay}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </main>
