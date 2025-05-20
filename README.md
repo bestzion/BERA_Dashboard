@@ -48,5 +48,16 @@ NEXT_PUBLIC_ZAPPER_API_KEY=본인의_발급_키_입력
 ```
 npm run dev
 ```
+- http://localhost:3000/ 접속
+
+### 5. 개인 지갑 연결
+
+- Metamask 지갑 연결
+<img width="1621" alt="Screenshot 2025-05-21 at 3 17 47 AM" src="https://github.com/user-attachments/assets/dbdffbfa-2ce8-4877-b5c7-1d825f862a01" />
+
+- Connect Wallet 버튼 클릭 후 지갑 연동
+- 투자 내역 확인
+<img width="1638" alt="Screenshot 2025-05-21 at 3 18 34 AM" src="https://github.com/user-attachments/assets/610d0c4c-038c-44a7-ba4f-bba602572708" />
+
 
 
